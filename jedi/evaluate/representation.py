@@ -289,8 +289,7 @@ class FunctionContext(use_metaclass(CachedMetaClass, context.TreeContext)):
         return ContextName(self, self.tree_node.name)
 
     def get_param_names(self):
-        function_execution = self.get_function_execution()
-        return [ParamName(function_execution, param.name) for param in self.tree_node.params]
+        return self.tree_node.params
 
 
 class FunctionExecutionContext(context.TreeContext):

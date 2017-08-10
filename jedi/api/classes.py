@@ -15,7 +15,7 @@ from jedi.evaluate import representation as er
 from jedi.evaluate import instance
 from jedi.evaluate import imports
 from jedi.evaluate import compiled
-from jedi.evaluate.filters import ParamName, TreeNameDefinition
+from jedi.evaluate.filters import ParamName
 from jedi.evaluate.imports import ImportName
 from jedi.api.keywords import KeywordName
 
@@ -82,6 +82,10 @@ class BaseDefinition(object):
         :rtype: str or None
         """
         return self._name.string_name
+
+    @property
+    def string_name(self):
+        return self.name
 
     @property
     def type(self):
@@ -321,44 +325,47 @@ class BaseDefinition(object):
         return [Definition(self._evaluator, d.name) for d in self._name.infer()]
 
     @property
+    def _context(self):
+        followed = list(self._name.infer())
+        if not followed or not hasattr(followed[0], 'py__call__'):
+            raise AttributeError()
+        context = followed[0]  # only check the first one.
+        return context
+
+    @property
     @memoize_method
     def params(self):
         """
         Raises an ``AttributeError``if the definition is not callable.
         Otherwise returns a list of `Definition` that represents the params.
         """
-        def get_param_names(context):
-            param_names = []
-            if context.api_type == 'function':
-                param_names = list(context.get_param_names())
-                if isinstance(context, instance.BoundMethod):
-                    param_names = param_names[1:]
-            elif isinstance(context, (instance.AbstractInstanceContext, er.ClassContext)):
-                if isinstance(context, er.ClassContext):
-                    search = '__init__'
-                else:
-                    search = '__call__'
-                names = context.get_function_slot_names(search)
-                if not names:
-                    return []
+        return self._get_param_names(self._context)
 
-                # Just take the first one here, not optimal, but currently
-                # there's no better solution.
-                inferred = names[0].infer()
-                param_names = get_param_names(next(iter(inferred)))
-                if isinstance(context, er.ClassContext):
-                    param_names = param_names[1:]
-                return param_names
-            elif isinstance(context, compiled.CompiledObject):
-                return list(context.get_param_names())
+    def _get_param_names(self, context):
+        param_names = []
+        if context.api_type == 'function':
+            param_names = list(context.get_param_names())
+            if isinstance(context, instance.BoundMethod):
+                param_names = param_names[1:]
+        elif isinstance(context, (instance.AbstractInstanceContext, er.ClassContext)):
+            if isinstance(context, er.ClassContext):
+                search = '__init__'
+            else:
+                search = '__call__'
+            names = context.get_function_slot_names(search)
+            if not names:
+                return []
+
+            # Just take the first one here, not optimal, but currently
+            # there's no better solution.
+            inferred = names[0].infer()
+            param_names = self._get_param_names(next(iter(inferred)))
+            if isinstance(context, er.ClassContext):
+                param_names = param_names[1:]
             return param_names
-
-        followed = list(self._name.infer())
-        if not followed or not hasattr(followed[0], 'py__call__'):
-            raise AttributeError()
-        context = followed[0]  # only check the first one.
-
-        return [_Param(self._evaluator, n) for n in get_param_names(context)]
+        elif isinstance(context, compiled.CompiledObject):
+            return list(context.get_param_names())
+        return param_names
 
     def parent(self):
         context = self._name.parent_context
@@ -671,22 +678,6 @@ class CallSignature(Definition):
     def __repr__(self):
         return '<%s: %s index %s>' % \
             (type(self).__name__, self._name.string_name, self.index)
-
-
-class _Param(Definition):
-    """
-    Just here for backwards compatibility.
-    """
-    def get_code(self):
-        """
-        .. deprecated:: 0.8.0
-           Use :attr:`.description` and :attr:`.name` instead.
-        .. todo:: Remove!
-
-        A function to get the whole code of the param.
-        """
-        warnings.warn("Deprecated since version 0.8. Use description instead.", DeprecationWarning, stacklevel=2)
-        return self.description
 
 
 class _Help(object):

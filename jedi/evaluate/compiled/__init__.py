@@ -10,6 +10,8 @@ from functools import partial
 from jedi._compatibility import builtins as _builtins, unicode
 from jedi import debug
 from jedi.cache import underscore_memoization, memoize_method
+from jedi.parser.python.tree import Param, Operator
+from jedi.evaluate.helpers import FakeName
 from jedi.evaluate.filters import AbstractFilter, AbstractNameDefinition, \
     ContextNameMixin
 from jedi.evaluate.context import Context, LazyKnownContext
@@ -97,12 +99,17 @@ class CompiledObject(Context):
 
     def get_param_names(self):
         params_str, ret = self._parse_function_doc()
-        tokens = params_str.split(',')
+        tokens = params_str.split(', ')
         if inspect.ismethoddescriptor(self.obj):
             tokens.insert(0, 'self')
+        params = []
         for p in tokens:
-            parts = p.strip().split('=')
-            yield UnresolvableParamName(self, parts[0])
+            parts = [FakeName(part) for part in p.strip().split('=', 1)]
+            if len(parts) > 1:
+                parts.insert(1, Operator('=', (0, 0)))
+            params.append(Param(parts, self))
+
+        return params
 
     def __repr__(self):
         return '<%s: %s>' % (self.__class__.__name__, repr(self.obj))

@@ -9,22 +9,20 @@ from jedi.api import keywords
 from jedi.evaluate.helpers import evaluate_call_of_leaf
 from jedi.evaluate.filters import get_global_filters
 from jedi.parser_utils import get_statement_of_position
+from jedi.evaluate.compiled import UnresolvableParamName
 
 
 def get_call_signature_param_names(call_signatures):
     # add named params
     for call_sig in call_signatures:
-        for p in call_sig.params:
-            # Allow protected access, because it's a public API.
-            tree_name = p._name.tree_name
-            # Compiled modules typically don't allow keyword arguments.
-            if tree_name is not None:
-                # Allow access on _definition here, because it's a
-                # public API and we don't want to make the internal
-                # Name object public.
-                tree_param = tree.search_ancestor(tree_name, 'param')
-                if tree_param.star_count == 0:  # no *args/**kwargs
-                    yield p._name
+        for param in call_sig.params:
+            # public API and we don't want to make the internal
+            # Name object public.
+            if param.star_count == 0:  # no *args/**kwargs
+                yield UnresolvableParamName(
+                    call_sig._context,
+                    param.name.value
+                )
 
 
 def filter_names(evaluator, completion_names, stack, like_name):

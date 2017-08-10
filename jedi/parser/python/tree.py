@@ -931,6 +931,10 @@ class Param(PythonBaseNode):
         return 0
 
     @property
+    def string_name(self):
+        return self.name.value
+
+    @property
     def default(self):
         try:
             return self.children[int(self.children[0] in ('*', '**')) + 2]
@@ -984,7 +988,6 @@ class Param(PythonBaseNode):
         return search_ancestor(self, ('funcdef', 'lambdef'))
 
     def get_description(self):
-        # TODO Remove?
         children = self.children
         if children[-1] == ',':
             children = children[:-1]
